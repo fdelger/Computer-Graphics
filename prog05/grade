@@ -1,0 +1,4 @@
+when switching from using the z+ and z- buttons to the arrow keys for x and y translations
+the old translation seems to be lost.
+that is, the z translation is not persistent. as soon as you start using the arrow keys again,
+it snaps back to the original z translation.

@@ -1,0 +1,41 @@
+1. Modify Picture.js to set this.picture2world and this.world2picture
+   to their correct values.
+
+
+2. Uncomment out the call to sphere render in view.js.
+
+   Just before this call, pass model2picture into the fragment shader.
+
+   In the shader (after the line r=-v), calculate (vec4) pP and rP,
+   which are p and r in Picture coordinates.  Since r is only a vec3,
+   you need to multiply the matrix times vec4(r, 0).
+
+   Calculate where pP + s rP hits the plane of the picture (z=0).
+
+   If it hits the picture, add the PRODUCT of the colors in tex1 and
+   tex2 to the fragment color.
+
+   What this should look like is an "invisible sphere" which shows the
+   invisible tatoo.  (Make sure you are using the perspective view.)
+
+
+3. Comment out the initialization of picture in view.js.  Hang the
+   picture on the right side instead, with the origin at (1,1,-1) and the
+   picture coming towards you.
+
+   You may have to switch to perspective to see it because it will be
+   coming at you.
+
+
+4. Change the calculation of r in the fragment shader to use the
+   mirror rule.  The sphere should reflect the picture (after you
+   click flat/round at least once.)
+
+
+5. Comment out the calculation of r for mirror and instead calculate
+   it for diamond.  Move the picture back where it was behind the sphere.
+
+
+6. Add a button that switches between reflect and refract.
+
+

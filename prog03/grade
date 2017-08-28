@@ -1,0 +1,4 @@
+your transposition code is incorrect.
+it swaps each pair of elements twice, leaving you with the same matrix
+
+also, it should return a copy, not modify itself

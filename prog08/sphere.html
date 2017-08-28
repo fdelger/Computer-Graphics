@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+attribute vec4 vPosition;
+attribute vec4 vNormal;
+
+uniform mat4 model2clip;
+
+
+varying vec4 fPosition;
+varying vec4 fNormal;
+
+void
+main()
+{
+    fPosition = vPosition;
+    fNormal = vNormal;
+    gl_Position = model2clip * vPosition;
+}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+
+uniform vec4 lightI;
+uniform vec4 lightP;
+uniform vec4 eyeP;
+
+uniform vec4 color;
+uniform int useNormal;
+uniform int reflectOrRefract;
+uniform vec4 normal;
+
+uniform mat4 model2picture;
+
+varying vec4 fPosition;
+varying vec4 fNormal;
+
+uniform sampler2D tex1;
+uniform sampler2D tex2;
+
+void
+main()
+{
+if (useNormal == 0) {
+        // gl_FragColor = color;
+        gl_FragColor = texture2D(tex1, fPosition.xy);
+    }
+    else {
+      vec3 n = vec3(0, 0, 0);
+      if (useNormal == 1)
+        n = normalize(normal.xyz);
+      else
+        n = normalize(fNormal.xyz);
+
+      // Look at the following and then calculate diffuse.
+      // Use dot(n, l)
+      // Set flatOrRound = 1 at the top of view.js to check.
+      vec3 l = normalize((lightP - fPosition).xyz);
+      vec3 v = normalize((eyeP - fPosition).xyz);
+
+      vec3 diffuse = (lightI * color * max(dot(n, l), 0.0)).xyz;
+
+      // Calculate r and specular
+      vec3 r = normalize(2.0 * dot(n, l) * n - l);
+      vec3 specular = (lightI * pow(max(dot(v, r), 0.0), 100.0)).xyz;
+
+      vec3 ambient = vec3(0.1, 0.1, 0.1);
+
+      vec4 shading = vec4(specular + ambient, 1.0);
+
+      // Make the sphere out of air.
+      r = -v;
+      
+      if (reflectOrRefract == 0)
+        r = normalize(2.0 * dot(n, v) * n - v);
+      else {
+        vec3 u, diamond;
+        u = v - dot(v,n) * n;
+        diamond = -u/2.4;
+        r=diamond-sqrt(1.0-dot(diamond,diamond))*n;
+      }
+      vec4 rP;
+      vec4 pP;
+      float s;
+      vec4 ray;
+
+      rP = model2picture * vec4(r,0);
+      pP = model2picture * fPosition;
+      s = -pP.z / rP.z;
+      ray = pP + rP * s ; 
+      
+      if(s>0.0 && ray.x > 0.0 && ray.x < 1.0 && ray.y > 0.0 && ray.y < 1.0)
+        gl_FragColor = texture2D(tex1,ray.xy) * texture2D(tex2,ray.xy) + shading;
+      else
+        gl_FragColor = shading;
+
+   }
+}
+</script>
+
+<script type="text/javascript" src="../Common/webgl-utils.js"></script>
+<script type="text/javascript" src="../Common/initShaders.js"></script>
+<script type="text/javascript" src="../Common/PVMat.js"></script>
+<script type="text/javascript" src="../Common/Texture2D.js"></script>
+<script type="text/javascript" src="Sphere.js"></script>
+<script type="text/javascript" src="Picture.js"></script>
+<script type="text/javascript" src="view.js"></script>
+<div>
+zoom 1x <input id="slider" type="range"
+ min="100" max="1000" step="10" value="100" />
+ 10x
+</div>
+
+</head>
+
+<body>
+<button id="MyButton">My Button</button>
+<button id="flat">FlatRnd</button>
+<button id="lookAt">Look At</button>
+<button id="ZPlus">z + 0.1</button>
+<button id="ZMinus">z - 0.1</button>
+<button id="ReflectRefract">Reflect or Refract</button>
+<p>
+<canvas id="gl-canvas" width="960" height="540">
+Oops ... your browser doesn't support the HTML5 canvas element
+</canvas>
+</body>
+</html>

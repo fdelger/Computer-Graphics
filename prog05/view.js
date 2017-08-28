@@ -1,0 +1,403 @@
+var gl;
+var program;
+var cube;
+var model2clip;
+// can you get sublime text editor - its better than this
+// im gonna try the 64 bit cause this is a new laptop i got a week ago and idek what bit it is
+
+window.onload = function init()
+{
+    var canvas = document.getElementById( "gl-canvas" );
+    
+    gl = WebGLUtils.setupWebGL( canvas );
+    if ( !gl ) { alert( "WebGL isn't available" ); }
+
+    gl.viewport( 0, 0, canvas.width, canvas.height );
+    gl.clearColor( 0.0, 0.0, 0.0, 1.0 );
+    
+    program = initShaders( gl, "vertex-shader", "fragment-shader" );
+    gl.useProgram( program );
+    
+
+    cube = new Cube(gl);
+    // for some reason im getting a black square where my mouse is hovering
+    // get to exercise 2 for me
+
+    // Make the center of the model the origin of the object.
+    var modelT = new PV(-0.5, -0.5, -0.5, false);
+    var model2object = Mat.translation(modelT);
+    var object2model = Mat.translation(modelT.minus());
+
+    // Give the object a small initial rotation in x and y.
+    var object2rotated = Mat.rotation(1, 0.1).times(Mat.rotation(0, 0.1));
+    var rotated2object = Mat.rotation(0, -0.1).times(Mat.rotation(1, -0.1));
+
+    // Current translation of the object in the world.
+    var translation = new PV(0, 0, 0, false);
+    // EXERCISE 1
+    // Change z translation to -3.
+    translation = new PV(0, 0, -3, false);
+    var rotated2world = Mat.translation(translation);
+    var world2rotated = Mat.translation(translation.minus());
+
+    var world2view = new Mat();
+    var view2world = new Mat();
+
+    // Clicking lookAt button sets world2view and view2world using
+    // lookAt() function.
+    document.getElementById("lookAt").onclick = function () {
+        lookAt();
+    };
+
+    // Camera rotates to look at center of object, keeping its x-axis level.
+    function lookAt () {
+        // EXERCISE 4
+        // eye position is (0,0,0) in view coordinates....
+        // object center position is (0,0,0) in object coordinates....
+        // Convert both to world coordinates.
+        // Calculate view2world and world2view.
+	
+	var o = new PV(0,0,0,true);
+        o = rotated2world.times(object2rotated.times(o));
+	var e = new PV(0,0,0,true);
+        e = view2world.times(e);
+	
+	var vz = e.minus(o).unit();
+	var y = new PV(0, 1, 0, false);
+	var vx = y.cross(vz).unit();
+    var vy = vz.cross(vx);
+	var R = new Mat(vx, vy, vz);
+    var T = new Mat.translation(e);
+	view2world = T.times(R);
+    var Rinv = R.transpose();
+    var Tinv = Mat.translation(e.minus());
+    world2view = Rinv.times(Tinv);
+    // move to part 6
+        console.log("view2world * world2view\n" +
+                    view2world.times(world2view));
+        updateM2C();
+    }
+        
+    // Simple orthographic projection.
+    var view2proj = Mat.scale(new PV(1, 1, -1, false));
+    var proj2view = view2proj;
+ 
+    // Display portion of view between z=-near and z=-far.
+    var near = 2.0, far = 10.0;
+
+    function setOrthographic () {
+        // EXERCISE 1
+        // Set view2proj and proj2view based on values of near and far
+        // and the orthographic projection.
+        // What value of z translates to 0?
+        // How is z scaled so near goes to -1 and far goes to 1?
+	view2proj = Mat.scale(new PV(1, 1, -2/(far-near), false)).times(Mat.translation(new PV(0, 0, (near+far)/2, false)));
+	proj2view = Mat.translation(new PV(0, 0, -(near+far)/2, false)).times(Mat.scale(new PV(1,1, (far-near)/-2, false)));
+
+       console.log("view2proj * proj2view\n" +
+                   view2proj.times(proj2view));
+	
+        updateM2C();
+    }
+
+    function setPerspective () {
+        // EXERCISE 6
+        // Set view2proj and proj2view based on values of near and far
+        // and the perspective projection.
+        // Clicking My Button will switch between ortho and perspective.
+        
+        var a = -(far+near)/(far-near);
+        var b = -(2*far*near)/(far-near);
+        var aprime = -(far-near)/(2*far*near);
+        var bprime = (far+near)/(2*far*near); 
+        view2proj = new Mat();
+        proj2view = new Mat();
+        view2proj[2][2] = a;
+        view2proj[2][3] = b;
+        view2proj[3][2] = -1 ;
+        view2proj[3][3] = 0;
+
+        proj2view[2][2] = 0;
+        proj2view[2][3] = -1
+        proj2view[3][2] = aprime;
+        proj2view[3][3] = bprime;
+
+
+        console.log("view2proj * proj2view\n" +
+                    view2proj.times(proj2view));
+        updateM2C();
+    }
+
+    var aspect = canvas.width / canvas.height;
+    var proj2clip = Mat.scale(new PV(1 / aspect, 1, 1, true));
+    var clip2proj = Mat.scale(new PV(aspect, 1, 1, true));
+
+    // Zoom factor.
+    var zoom = 1;
+
+    function setZoom () {
+        // EXERCISE 5
+        // Set proj2clip and clip2proj based on zoom (and aspect ratio).
+	proj2clip = Mat.scale(new PV(zoom/aspect, zoom, 1, false));
+	clip2proj = Mat.scale(new PV(aspect/zoom, 1/zoom, 1, false));
+        
+        console.log("clip2proj * proj2clip\n" +
+                    clip2proj.times(proj2clip));
+        updateM2C();
+    }
+
+    var clip2canvas =
+        Mat.scale(new PV(canvas.width / 2.0, -canvas.height / 2.0, 1, true))
+        .times(Mat.translation(new PV(1, -1, 0, false)));
+    var canvas2clip =
+        Mat.translation(new PV(-1, 1, 0, false))
+        .times(Mat.scale(new PV(2.0 / canvas.width, -2.0 / canvas.height, 1, true)));
+
+    // EXERCISE 1
+    setOrthographic();
+
+    updateM2C();
+
+    function updateM2C () {
+        model2clip = proj2clip.times(view2proj).times(world2view).times(rotated2world).times(object2rotated).times(model2object);
+
+        console.log("model2clip " + model2clip);
+    }
+
+    document.getElementById("slider").onchange = function(event) {
+        console.log("slider " + event.target.value);
+
+        // EXERCISE 5
+        // Set zoom to go from 1 to 10 as slider goes through range.
+        // Zoom slider should now work.
+	zoom = event.target.value / 100;
+
+        console.log("zoom " + zoom);
+        setZoom();
+    };
+
+    var perspective = false;
+    document.getElementById("MyButton").onclick = function () {
+        console.log("You clicked My Button!");
+        if (perspective)
+            setPerspective();
+        else
+            setOrthographic();
+        perspective = !perspective;
+    };
+
+    var worldT = new PV(0,0,0,false);
+    
+    document.getElementById("ZPlus").onclick = function () {
+        console.log("You clicked z + 0.1.");
+
+        // EXERCISE 2
+        // Change the following code to modify world2view and
+        // view2world corresponding to moving the camera 0.1 in the
+        // positive z direction.
+        //translation[2] -= 0.1;
+        //rotated2world = Mat.translation(translation);
+        //world2rotated = Mat.translation(translation.minus());
+        
+        var mat = Mat.translation(new PV(0,0,-0.1,0));
+        var mat2 = Mat.translation(new PV(0,0,0.1,0));
+        world2view = mat.times(world2view);
+        view2world = view2world.times(mat2);
+
+        
+	/*
+	worldT[2] += 0.1;
+	world2view = Mat.translation(worldT);
+	view2world = Mat.translation(worldT.minus());
+    */
+        console.log("world2view * view2world\n" +
+                    world2view.times(view2world));
+        updateM2C();
+    };
+    // move on to part 4
+    document.getElementById("ZMinus").onclick = function () {
+        console.log("You clicked z - 0.1.");
+        // EXERCISE 2
+        // Change the following code to modify world2view and
+        // view2world corresponding to moving the camera 0.1 in the
+        // negative z direction.
+
+        var mat = Mat.translation(new PV(0,0,0.1,0));
+        var mat2 = Mat.translation(new PV(0,0,-0.1,0));
+        world2view = mat.times(world2view);
+        view2world = view2world.times(mat2);
+
+        console.log("world2view * view2world\n" +
+                    world2view.times(view2world));
+        updateM2C();
+    };
+
+    var clientX, clientY;
+    var downWorld;
+    var mouseIsDown = false;
+
+    canvas.addEventListener("mousedown", function (e) {
+        clientX = e.clientX;
+        clientY = e.clientY;
+        var cursorX = e.clientX - canvas.offsetLeft;
+        var cursorY = e.clientY - canvas.offsetTop;
+        console.log("X: " + cursorX + " Y: " + cursorY);
+        var clipX = cursorX * 2 / canvas.width - 1;
+        var clipY = -(cursorY * 2 / canvas.height - 1);
+        console.log("X: " + clipX + " Y: " + clipY);
+
+        // EXERCISE 7
+        // Transform center of object to canvas coordinates and
+        // homogenenize (use .homogeneous()).
+        //var object2canvas
+
+        var object2canvas = clip2canvas.times(proj2clip.times(view2proj.times(world2view.times(rotated2world.times(object2rotated.times(new PV(0,0,0,true)))))));
+        object2canvas = object2canvas.homogeneous();
+
+        // CHANGE the following mouse click to use the z-coordinate of
+        // center of object instead of zero.
+        var mouseCanvas = new PV(cursorX, cursorY, object2canvas[2], true);
+
+        // Homogenize the following:
+        var mouseWorld = view2world.times(proj2view.times(clip2proj.times(canvas2clip.times(mouseCanvas))));
+        mouseWorld = mouseWorld.homogeneous();
+        downWorld = mouseWorld;
+        mouseIsDown = true;
+    });
+
+    canvas.addEventListener("mouseup", function (e) {
+        mouseIsDown = false;
+        if (e.clientX == clientX && e.clientY == clientY) {
+            var cursorX = e.clientX - canvas.offsetLeft;
+            var cursorY = e.clientY - canvas.offsetTop;
+            console.log("X: " + cursorX + " Y: " + cursorY);
+            var clipX = cursorX * 2 / canvas.width - 1;
+            var clipY = -(cursorY * 2 / canvas.height - 1);
+            console.log("X: " + clipX + " Y: " + clipY);
+        }
+    });
+
+    canvas.addEventListener("mousemove", function (e) {
+        if (!mouseIsDown)
+            return;
+        var cursorX = e.clientX - canvas.offsetLeft;
+        var cursorY = e.clientY - canvas.offsetTop;
+        console.log("X: " + cursorX + " Y: " + cursorY);
+        var clipX = cursorX * 2 / canvas.width - 1;
+        var clipY = -(cursorY * 2 / canvas.height - 1);
+        console.log("X: " + clipX + " Y: " + clipY);
+
+        // EXERCISE 7
+        // Same as in mousedown.
+       var object2canvas = clip2canvas.times(proj2clip.times(view2proj.times(world2view.times(rotated2world.times(object2rotated.times(new PV(0,0,0,true)))))));
+        object2canvas = object2canvas.homogeneous();
+
+        var mouseCanvas = new PV(cursorX, cursorY, object2canvas[2], true);
+        var mouseWorld = view2world.times(proj2view.times(clip2proj.times(canvas2clip.times(mouseCanvas))));
+        mouseWorld = mouseWorld.homogeneous();
+        translation = translation.plus(mouseWorld.minus(downWorld));
+        downWorld = mouseWorld;
+
+        rotated2world = Mat.translation(translation);
+        world2rotated = Mat.translation(translation.minus());
+
+        console.log("rotated2world * world2rotated\n" +
+                    rotated2world.times(world2rotated));
+        updateM2C();
+    });
+
+    var moveT = new PV(0, 0, 0, false);
+    window.onkeydown = function( event ) {
+        switch (event.keyCode) {
+        case 37:
+            console.log('left');
+	    moveT[0] += 0.1; 
+	    view2world = Mat.translation(moveT.minus());
+	    world2view = Mat.translation(moveT);
+	    
+	    break;
+        case 38:
+            console.log('up');
+	    moveT[1] -= 0.1; 
+	    view2world = Mat.translation(moveT.minus());
+	    world2view = Mat.translation(moveT);
+	   
+            break;
+        case 39:
+            console.log('right');
+	    moveT[0] -= 0.1; 
+	    view2world = Mat.translation(moveT.minus());
+	    world2view = Mat.translation(moveT);
+	   
+            break;
+        case 40:
+            console.log('down');
+	    moveT[1] += 0.1; 
+	    view2world = Mat.translation(moveT.minus());
+	    world2view = Mat.translation(moveT);
+	   
+            break;
+        }
+        
+        // EXERCISE 3
+        // Update world2view and view2world so that arrow keys move
+        // the camera in the direction of the arrow by 0.1 units.
+        
+        
+        var key = String.fromCharCode(event.keyCode);
+        var rotSign = event.shiftKey ? -1 : 1;
+        console.log("You clicked " + key);
+        switch( key ) {
+        case 'X':
+            object2rotated = Mat.rotation(0, 0.1 * rotSign).times(object2rotated);
+            rotated2object = rotated2object.times(Mat.rotation(0, -0.1 * rotSign));
+            break;
+            
+        case 'Y':
+            object2rotated = Mat.rotation(1, 0.1 * rotSign).times(object2rotated);
+            rotated2object = rotated2object.times(Mat.rotation(1, -0.1 * rotSign));
+            break;
+            
+        case 'Z':
+            object2rotated = Mat.rotation(2, 0.1 * rotSign).times(object2rotated);
+            rotated2object = rotated2object.times(Mat.rotation(2, -0.1 * rotSign));
+            break;
+        }
+        
+        updateM2C();
+    };
+
+    window.onresize = function (event) {
+        console.log("resize " + canvas.width + " " + canvas.height);
+    }
+
+    render();
+};
+
+
+function render() {
+    gl.enable(gl.DEPTH_TEST)
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    var model2clipLoc = gl.getUniformLocation( program, "model2clip" );
+
+
+    if (false) {
+    var vPosition = gl.getAttribLocation( program, "vPosition" );
+    var colorLoc = gl.getUniformLocation( program, "color" );
+
+    gl.bindBuffer( gl.ARRAY_BUFFER, bufferId2 );
+    gl.vertexAttribPointer( vPosition, 4, gl.FLOAT, false, 0, 0 );
+    gl.enableVertexAttribArray( vPosition );
+    var color2 = new PV(1.0, 1.0, 0.0, 1.0);
+    gl.uniform4fv( colorLoc, color2.flatten());
+
+    gl.drawArrays( gl.TRIANGLE_STRIP, 0, vertices2.length );
+    }
+
+    gl.uniformMatrix4fv(model2clipLoc, false, model2clip.flatten());
+
+    cube.render(gl, program);
+
+    requestAnimFrame( render )
+}
