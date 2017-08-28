@@ -1,0 +1,49 @@
+scripts/view.js:
+
+1. The right and left eye are eye_sep/2.0 to the right and left
+   (positive and negative x-direction) of the camera position.  You
+   know how moving the camera affects world2view and view2world.
+
+2. The viewing window in the plane z=-n (n=near) is l<=x<=r and
+   b<=y<=t.  b and t are angle aperture/2 below and above the horizontal.
+   l and r are wider apart according to aspect, the aspect ratio.
+
+3. The projection of the viewing window into the plane z=-1 is
+   l/n<=x<=r/n,b/n<=y<=t/n.  proj2clip transforms it to -1<=x,y<=1.
+   What is proj2clip?
+
+4. We want (0,0,-focal_length) to appear in the center of each eye's
+   viewing window. When we switch from middle to left eye, which way
+   does the point appear to move?  How much do we have to move the
+   left viewing window in that direction to put that point in the
+   center?  (Switching from z=-focal_length to z=-n shrinks the
+   distance by a facor of n/focal_length.)
+
+5. proj2clipL and proj2clipR use the modified viewing window and the
+   same formula as #3.
+
+scripts/Sphere.js:
+
+6. A sphere has position p, (linear) velocity v, and acceleration a.
+   For time step dt, v = v + a dt and p = p + v dt.
+
+7. A sphere has angular velocity w.  uz = w.unit().  How can we
+   calculate ux perpendicular to uz?  How about uy?
+   vz = uz and vx = (ux + uy dt).unit().  How about vy?
+   What rotation take ux,uy,uz to vx,vy,vz?
+   Apply it to object2rotated.
+
+8. p1 is this.p and p2 is that.p.  Current distance is |p1-p2|.  Move
+   this in the direction (p1-p2).unit and that in the direction
+   (p2-p1).unit() to get them 2.001 apart.  (The extra 0.001 is to
+   make sure they don't appear overlapped.)
+
+9. u = (p1-p2).unit().  For m=1, the total kinetic energy is
+   1/2 v1^2 + 1/2 v2^2.  Calculate s so that
+   v1 -> v1 + s u
+   v2 -> v2 - su
+   does not change the total kinetic energy.  Update v1 and v2.
+
+10. I did the angle version for you.
+
+

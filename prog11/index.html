@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<!-- Shader to render the scene standardly from a viewpoint -->
+<script id="standard-vertex-shader" type="x-shader/x-vertex">
+
+</script>
+
+<script id="standard-fragment-shader" type="x-shader/x-fragment">
+
+</script>
+
+<!-- Shader to render the skybox -->
+
+<script id="standard-vertex-shader" type="x-shader/x-vertex">
+
+</script>
+
+<script id="standard-fragment-shader" type="x-shader/x-fragment">
+
+</script>
+
+<!--  Shader to render the env mapped cube -->
+
+
+<script id="sky-vertex-shader" type="x-shader/x-vertex">
+attribute vec4 vPosition;
+
+uniform mat4 model2world;
+uniform mat4 world2view;
+uniform mat4 view2clip;
+
+varying vec4 mPosition;
+
+void
+main()
+{
+    mPosition = vPosition;
+    vec4 pos = view2clip * world2view * model2world * vec4(vPosition.xyz, 1.0);
+    gl_Position = pos.xyww;
+}
+
+</script>
+
+<script id="sky-fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+
+varying vec4 mPosition;
+
+uniform sampler2D tex1;
+
+void main() {
+  gl_FragColor = texture2D(tex1, mPosition.xy);
+}
+
+</script>
+
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+attribute vec4 vPosition;
+attribute vec4 vNormal;
+
+uniform mat4 model2world;
+uniform mat4 world2view;
+uniform mat4 view2clip;
+
+varying vec4 mPosition;
+varying vec4 mNormal;
+
+varying vec4 wPosition;
+varying vec4 wNormal;
+
+void main() {
+    mPosition = vPosition;
+    mNormal = vNormal;
+    wPosition = model2world * vPosition;
+    wNormal = model2world * vNormal;
+    gl_Position = view2clip * world2view * wPosition;
+}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+
+uniform vec4 lightP;
+uniform vec4 eyeP;
+
+uniform vec4 lightI;
+uniform int useNormal;
+
+varying vec4 mPosition;
+varying vec4 wPosition;
+varying vec4 mNormal;
+varying vec4 wNormal;
+
+uniform sampler2D tex1;
+uniform sampler2D tex2;
+
+const float PI = 3.1415926535897932384626433832795;
+
+void
+main()
+{
+
+  if (useNormal == 0) {
+    gl_FragColor = texture2D(tex1, mPosition.xy);
+  }
+  else {
+    vec3 n = normalize(wNormal.xyz);
+
+    // Look at the following and then calculate diffuse.
+    // Use dot(n, l)
+    // Set flatOrRound = 1 at the top of view.js to check.
+    vec3 l = normalize((lightP - wPosition).xyz);
+    vec3 v = normalize((eyeP - wPosition).xyz);
+
+    vec2 xy = vec2(asin(mNormal.x)/PI + 0.5, asin(mNormal.y)/PI + 0.5);
+    vec4 color = texture2D(tex1, xy);
+
+    vec3 diffuse = (lightI * color * max(dot(n, l), 0.0)).xyz;
+
+    // Calculate r and specular
+    vec3 r = normalize(2.0 * dot(n, l) * n - l);
+    vec3 specular = (lightI * pow(max(dot(v, r), 0.0), 100.0)).xyz;
+
+    vec3 ambient = vec3(0.1, 0.1, 0.1);
+
+    gl_FragColor = vec4(diffuse + specular + ambient, 1.0);  	
+    
+  }
+}
+</script>
+
+<script type="text/javascript" src="Common/webgl-utils.js"></script>
+<script type="text/javascript" src="Common/initShaders.js"></script>
+<script type="text/javascript" src="Common/PVMat.js"></script>
+<script type="text/javascript" src="Common/Texture2D.js"></script>
+<script type="text/javascript" src="scripts/Sphere.js"></script>
+<script type="text/javascript" src="scripts/Picture.js"></script>
+<script type="text/javascript" src="scripts/Skybox.js"></script>
+<script type="text/javascript" src="scripts/view.js"></script>
+
+<link rel="stylesheet" href="styles/style.css">
+
+</head>
+
+<body onload="load()">
+	<button id="animate" onclick="animation()">animate</button>
+	<button id="fullscreen" onclick="full()">Fullscreen</button>
+	<button id="skybox" onclick="skyboxChange()">Ocean/Space</button>
+	<br />
+	<br />
+	<div id="screen">
+		<canvas id="gl-canvas" width="800" height="450">Oops ... your browser doesn't support the HTML5 canvas element</canvas>
+	</div>
+
+</body>
+</html>
